@@ -13,8 +13,8 @@
     Bingo_Log::init($arrLogConfig, 'ui');
 
     /* 连接数据库 */
-	$con = mysql_connect( "10.10.0.149:3306", "root", "root" );
-	//$con = mysql_connect( "10.10.0.9:4051", "root", "duoku2012" );
+	//$con = mysql_connect( "10.10.0.149:3306", "root", "root" );
+	$con = mysql_connect( "10.10.0.9:4051", "root", "duoku2012" );
     if ( !$con ){
         die( 'Could not connect: ' . mysql_error() );
     }
@@ -25,6 +25,7 @@
 
 	$time_type = when_the_hour();
 
+	$total_num = 0;
 	//$query = "select c_id, lowest_num, highest_num from mcp_content_qp_activity_person where enable=1 and \"$nowtime\">start_time and \"$nowtime\"<end_time;"; 
 	$query = "select c_id, lowest_num, highest_num from mcp_content_qp_activity_person_increment where time_type = $time_type;"; 
 	$result = mysql_query( $query );
@@ -39,7 +40,7 @@
 		//$rate *= get_rate();
 		//echo $rate."\n";
 		//$join_num_new = $lowest_num + $incr;
-		$query2 = "update mcp_content_qp_activity_person set num=$join_num_new where id=$c_id;"; 
+		$query2 = "update mcp_content_qp_activity_person set num=$join_num_new where c_id=$c_id;"; 
 		$result2 = mysql_query( $query2 );
 		if( mysql_affected_rows() == 0 ) 
 		{
@@ -50,8 +51,13 @@
 		else{
 			Bingo_Log::notice("$query2");
 		}
+		$total_num += $join_num_new;
 	}
 	
+	$query4 = "update mcp_content_qp_activity_person set num=$total_num where c_id=0;"; 
+	$result4 = mysql_query( $query4 );
+	Bingo_Log::notice("$query4");
+
 	/*function get_rate()*/
 	//{
 		//$i = weekday_or_weekend();

@@ -11,12 +11,19 @@
                                         ),
                          );
     Bingo_Log::init($arrLogConfig, 'ui');
-	
+
 	$redis = new Redis();
     $redis->connect('10.10.0.141',6382);
 	$redis -> select(3);
+
 	$key = "award_probability";
 	$redis->delete($key);
+
+	$key3 = "award_prize";
+	$redis->delete($key3);
+
+	$key4 = "award_list";
+	$redis->delete($key4);
 
 	/* 连接数据库 */
 	$con = mysql_connect( "10.10.0.149:3306", "root", "root" );
@@ -29,8 +36,8 @@
 
 	$nowtime = date("Y-m-d G:i:s");
 
-	//$query = "select id, probability from props_commodity where enable=1 and \"$nowtime\">start_time and \"$nowtime\"<end_time;"; 
-	$query = "select id, probability, type, begin_time, end_time, store_num, sell_num, name, auto_expired_type, is_slyder, func_desc from props_commodity where enable = 1 order by probability asc;"; 
+	//$query = "select id, probability from props_commodity where enable=1 and \"$nowtime\">start_time and \"$nowtime\"<end_time;";
+	$query = "select id, probability, type, begin_time, end_time, store_num, sell_num, name, auto_expired_type, is_slyder, func_desc, icon from props_commodity where enable = 1 order by probability asc;";
 	$result = mysql_query( $query );
 	$probability_begin = 0;
 	$probability_end = 0;
@@ -38,7 +45,7 @@
 	{
 		$id = $row[0];
 		$probability = $row[1];
-		
+
 		$type = $row[2];
 		$begin_time = $row[3];
 		$end_time = $row[4];
@@ -52,6 +59,7 @@
 		$auto_expired_type = $row[8];
 		$is_slyder = $row[9];
 		$func_desc = $row[10];
+		$icon = $row[11];
 
 		$pic_name = "";
 		$pic_url = "";
@@ -59,8 +67,8 @@
 		//如果是图片或者音乐，还需要把图片的信息放到redis set 里
 		if($type == 4)
 		{
-			$key4 = "award_prize";
-			$redis->delete($key4);
+			//$key3 = "award_prize";
+			//$redis->delete($key3);
 
 			$query3 = "select commodity_id, name, icon, pic_url from props_pic where commodity_id = $id and enable=1";
 			$result3 = mysql_query( $query3 );
@@ -72,8 +80,8 @@
 				$prize_url = $row3[3];
 
 				$value = "$award_id,$type,$begin_time,$end_time,$store_num,$sell_num,$name,$prize_name,$icon,$prize_url,$auto_expired_type,$is_slyder";
-				$redis->sAdd("$key4", "$value");
-				Bingo_Log::notice("set value to [$key4] value:[$value]\n");
+				$redis->sAdd("$key3", "$value");
+				Bingo_Log::notice("set value to [$key3] value:[$value]\n");
 			}
 
 			//$exist = $redis->exists($key3);
@@ -83,7 +91,7 @@
 			/*}*/
 		}
 
-		
+
 		//获取概率入redis list
 		//$probability_begin = $probability_begin + $probability;
 		if( 0 != $probability ){
@@ -108,42 +116,42 @@
 			//continue;
 		/*}*/
 		$redis->delete($key2);
-		$redis->hMset($key2, array('id'=>$id, 'type'=>$type, 'begin_time'=>$begin_time, 'end_time'=>$end_time, 'store_num'=>$store_num, 
-			'sell_num'=>$sell_num, 'name'=>$name, 'prize_name'=>$pic_name, 'icon'=>$icon, 'prize_url'=>$pic_url, 'auto_expired_type'=>$auto_expired_type, 
+		$redis->hMset($key2, array('id'=>$id, 'type'=>$type, 'begin_time'=>$begin_time, 'end_time'=>$end_time, 'store_num'=>$store_num,
+			'sell_num'=>$sell_num, 'name'=>$name, 'prize_name'=>$pic_name, 'icon'=>$icon, 'prize_url'=>$pic_url, 'auto_expired_type'=>$auto_expired_type,
 			'is_slyder'=>$is_slyder, 'func_desc'=>$func_desc));
 
-		Bingo_Log::notice("hmset value to [$key2] value:{type:[$type], name:[$name], begin_time:[$begin_time], end_time:[$end_time], 
-			store_num:[$store_num], sell_num:[$sell_num], prize_name:[$pic_name], icon:[$icon], prize_url[$pic_url], auto_expired_type[$auto_expired_type], 
+		Bingo_Log::notice("hmset value to [$key2] value:{type:[$type], name:[$name], begin_time:[$begin_time], end_time:[$end_time],
+			store_num:[$store_num], sell_num:[$sell_num], prize_name:[$pic_name], icon:[$icon], prize_url[$pic_url], auto_expired_type[$auto_expired_type],
 			is_slyder[$is_slyder], func_desc[$func_desc]}\n");
 		//name是大的分类，比如图片，prize_name是具体的音乐或图片的名称
 
 		// 将奖品id放到redis list
-		$key4 = "award_list";
-		
+		//$key4 = "award_list";
+		//$redis->delete($key4);
 		$redis->sAdd( $key4, $key2 );
-		Bingo_Log::notice("push value to [$key3] value:[$key2]");
+		Bingo_Log::notice("push value to [$key4] value:[$key2]");
 
 		//如果是兑奖码，还需要把兑奖号码放到redis set里
 		if($type == 1)
 		{
-			$key3 = "award_num_$id";
-			$exist = $redis->exists($key3);
+			$key5 = "award_num_$id";
+			$exist = $redis->exists($key5);
 			//echo $exist."\n";
 			if( true == $exist ) {
 				continue;
 			}
 
-			$query2 = "select number from props_exchange_code where commodity_id=$id and type=0;"; 
+			$query2 = "select number from props_exchange_code where commodity_id=$id and type=0;";
 			$result2 = mysql_query( $query2 );
 			//Bingo_Log::notice("$query2");
 			while( $row2=mysql_fetch_row($result2) )
 			{
 				$num = $row2[0];
-				$redis->sAdd("$key3", "$num");
-				Bingo_Log::notice("set value to [$key3] num:[$num]\n");
+				$redis->sAdd("$key5", "$num");
+				Bingo_Log::notice("set value to [$key5] num:[$num]\n");
 			}
 		}
-		
+
 	}
 
 ?>
